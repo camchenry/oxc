@@ -335,7 +335,15 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
                 _ => false,
             }
         }
-        AriaPropertyType::Number => todo!(),
+        AriaPropertyType::Number => {
+            let Some(prop_value) = prop_value else {
+                return false;
+            };
+            let Ok(parsed_value) = parse_jsx_value(prop_value) else {
+                return false;
+            };
+            parsed_value.is_finite()
+        }
         AriaPropertyType::Token { values: _ } => todo!(),
         AriaPropertyType::TokenList { values: _ } => todo!(),
         AriaPropertyType::Tristate => match prop_value {
