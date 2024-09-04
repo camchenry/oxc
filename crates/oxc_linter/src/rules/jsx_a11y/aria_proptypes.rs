@@ -1,5 +1,5 @@
 use oxc_ast::{
-    ast::{JSXAttributeItem, JSXAttributeValue},
+    ast::{JSXAttributeItem, JSXAttributeValue, JSXExpression},
     AstKind,
 };
 use oxc_diagnostics::OxcDiagnostic;
@@ -209,6 +209,7 @@ fn test() {
     let fail = vec![
         r#"<div aria-hidden="yes" />"#,
         r#"<div aria-hidden="no" />"#,
+        r#"<div aria-hidden={"no"} />"#,
         "<div aria-hidden={1234} />",
         "<div aria-hidden={`${abc}`} />",
         "<div aria-label />",
@@ -261,14 +262,25 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
     };
     match prop_type {
         AriaPropertyType::Boolean { allow_undefined } => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(value)) => {
-                value.value == "true" || value.value == "false"
-            }
+            Some(JSXAttributeValue::StringLiteral(value)) => is_boolean_value(&value.value),
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_boolean_value(&str_lit.value),
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_boolean_value(&template.quasis[0].value.raw)
+                }
+                JSXExpression::NumericLiteral(_) => false,
+                _ => true,
+            },
             None => *allow_undefined,
             _ => true,
         },
         _ => true,
     }
+}
+
+fn is_boolean_value(value: &str) -> bool {
+    value == "true" || value == "false"
 }
 
 /// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
