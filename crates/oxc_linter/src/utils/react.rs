@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use oxc_ast::{
     ast::{
         CallExpression, Expression, JSXAttributeItem, JSXAttributeName, JSXAttributeValue,
-        JSXChild, JSXElement, JSXExpression, JSXOpeningElement, MemberExpression,
+        JSXChild, JSXElement, JSXExpression, JSXOpeningElement, MemberExpression, UnaryOperator,
     },
     match_member_expression, AstKind,
 };
@@ -249,6 +249,21 @@ pub fn parse_jsx_value(value: &JSXAttributeValue) -> Result<f64, ()> {
                 tmpl.quasis.first().unwrap().value.raw.parse().or(Err(()))
             }
             JSXExpression::NumericLiteral(num) => Ok(num.value),
+            JSXExpression::UnaryExpression(unary_expr) => {
+                let Expression::NumericLiteral(num) = &unary_expr.argument else {
+                    return Err(());
+                };
+
+                match unary_expr.operator {
+                    // Example: `tabIndex={-1}`
+                    UnaryOperator::UnaryNegation => Ok(-num.value),
+                    // Example: `tabIndex={+1}`
+                    UnaryOperator::UnaryPlus => Ok(num.value),
+                    // Example: `tabIndex={~1}`
+                    UnaryOperator::BitwiseNot => Ok((!(num.value as i32)) as f64),
+                    _ => Err(()),
+                }
+            }
             _ => Err(()),
         },
         _ => Err(()),

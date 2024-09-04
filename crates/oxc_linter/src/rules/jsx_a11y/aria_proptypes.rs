@@ -7,7 +7,10 @@ use oxc_macros::declare_oxc_lint;
 use oxc_span::Span;
 
 use crate::{
-    context::LintContext, globals::VALID_ARIA_PROPS, rule::Rule, utils::get_jsx_attribute_name,
+    context::LintContext,
+    globals::VALID_ARIA_PROPS,
+    rule::Rule,
+    utils::{get_jsx_attribute_name, parse_jsx_value},
     AstNode,
 };
 
@@ -262,6 +265,19 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
         return true;
     };
     dbg!(prop_name, prop_type, prop_value);
+
+    // Ignore the attribute if its prop value is null or undefined
+    if let Some(JSXAttributeValue::ExpressionContainer(expr)) = prop_value {
+        if let JSXExpression::NullLiteral(_) = &expr.expression {
+            return true;
+        }
+        if let JSXExpression::Identifier(ident) = &expr.expression {
+            if ident.name == "undefined" {
+                return true;
+            }
+        }
+    }
+
     match prop_type {
         AriaPropertyType::Boolean { allow_undefined } => match prop_value {
             Some(JSXAttributeValue::StringLiteral(value)) => is_boolean_value(&value.value),
@@ -303,7 +319,22 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             _ => false,
         },
         AriaPropertyType::IdList => todo!(),
-        AriaPropertyType::Integer => todo!(),
+        AriaPropertyType::Integer => {
+            let Some(prop_value) = prop_value else {
+                return false;
+            };
+            let is_integer_value =
+                parse_jsx_value(prop_value).map_or(false, |num| num.fract() == 0.0);
+            match prop_value {
+                JSXAttributeValue::StringLiteral(_) => is_integer_value,
+                JSXAttributeValue::ExpressionContainer(expr) => match &expr.expression {
+                    JSXExpression::Identifier(_) => true,
+                    JSXExpression::StaticMemberExpression(_) => true,
+                    _ => is_integer_value,
+                },
+                _ => false,
+            }
+        }
         AriaPropertyType::Number => todo!(),
         AriaPropertyType::Token { values: _ } => todo!(),
         AriaPropertyType::TokenList { values: _ } => todo!(),
@@ -366,4 +397,5 @@ const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_m
     "aria-checked" => AriaPropertyType::Tristate,
     "aria-hidden" => AriaPropertyType::Boolean { allow_undefined: true },
     "aria-label" => AriaPropertyType::String,
+    "aria-level" => AriaPropertyType::Integer,
 };
