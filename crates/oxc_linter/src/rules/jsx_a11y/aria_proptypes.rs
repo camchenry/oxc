@@ -74,6 +74,7 @@ fn test() {
         r#"<div aria-foo="true" />"#,
         r#"<div abcaria-foo="true" />"#,
         "<div aria-hidden={true} />",
+        "<div aria-hidden={true && false} />", // added test
         r#"<div aria-hidden="true" />"#,
         r#"<div aria-hidden={"false"} />"#,
         "<div aria-hidden={!false} />",
@@ -209,7 +210,7 @@ fn test() {
     let fail = vec![
         r#"<div aria-hidden="yes" />"#,
         r#"<div aria-hidden="no" />"#,
-        r#"<div aria-hidden={"no"} />"#,
+        r#"<div aria-hidden={"no"} />"#, // added test
         "<div aria-hidden={1234} />",
         "<div aria-hidden={`${abc}`} />",
         "<div aria-label />",
@@ -260,6 +261,7 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
         // Unless we have an explicit type, we should assume it's valid to prevent false positives
         return true;
     };
+    dbg!(prop_name, prop_type, prop_value);
     match prop_type {
         AriaPropertyType::Boolean { allow_undefined } => match prop_value {
             Some(JSXAttributeValue::StringLiteral(value)) => is_boolean_value(&value.value),
@@ -269,13 +271,32 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
                     template.expressions.is_empty()
                         && is_boolean_value(&template.quasis[0].value.raw)
                 }
+                JSXExpression::BooleanLiteral(_)
+                | JSXExpression::LogicalExpression(_)
+                | JSXExpression::UnaryExpression(_) => true,
                 JSXExpression::NumericLiteral(_) => false,
                 _ => true,
             },
             None => *allow_undefined,
-            _ => true,
+            _ => false,
         },
-        _ => true,
+        AriaPropertyType::String => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::BooleanLiteral(_) => false,
+                _ => true,
+            },
+            _ => false,
+        },
+        AriaPropertyType::Id => todo!(),
+        AriaPropertyType::IdList => todo!(),
+        AriaPropertyType::Integer => todo!(),
+        AriaPropertyType::Number => todo!(),
+        AriaPropertyType::Token { values: _ } => todo!(),
+        AriaPropertyType::TokenList { values: _ } => todo!(),
+        AriaPropertyType::Tristate { allow_undefined: _ } => todo!(),
     }
 }
 
@@ -284,6 +305,7 @@ fn is_boolean_value(value: &str) -> bool {
 }
 
 /// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
+#[derive(Debug)]
 enum AriaPropertyType {
     /// Unconstrained value type
     String,
@@ -311,4 +333,5 @@ const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_m
     "aria-autocomplete" => AriaPropertyType::Token { values: &["inline", "list", "both", "none"] },
     "aria-braillelabel" => AriaPropertyType::String,
     "aria-hidden" => AriaPropertyType::Boolean { allow_undefined: true },
+    "aria-label" => AriaPropertyType::String,
 };
