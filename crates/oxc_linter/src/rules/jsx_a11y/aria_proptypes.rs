@@ -307,12 +307,32 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
         AriaPropertyType::Number => todo!(),
         AriaPropertyType::Token { values: _ } => todo!(),
         AriaPropertyType::TokenList { values: _ } => todo!(),
-        AriaPropertyType::Tristate { allow_undefined: _ } => todo!(),
+        AriaPropertyType::Tristate => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => is_tristate_value(&value.value),
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_tristate_value(&str_lit.value),
+                JSXExpression::BooleanLiteral(_)
+                | JSXExpression::LogicalExpression(_)
+                | JSXExpression::UnaryExpression(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_tristate_value(&template.quasis[0].value.raw)
+                }
+                _ => true,
+            },
+            None => true,
+            _ => false,
+        },
     }
 }
 
 fn is_boolean_value(value: &str) -> bool {
     value == "true" || value == "false"
+}
+
+fn is_tristate_value(value: &str) -> bool {
+    is_boolean_value(value) || value == "mixed"
 }
 
 /// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
@@ -335,7 +355,7 @@ enum AriaPropertyType {
     /// A list of one or more tokens.
     TokenList { values: &'static [&'static str] },
     /// Value representing true, false, mixed, or undefined values. The default value for this value type is undefined unless otherwise specified.
-    Tristate { allow_undefined: bool },
+    Tristate,
 }
 
 const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_map! {
@@ -343,6 +363,7 @@ const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_m
     "aria-atomic" => AriaPropertyType::Boolean { allow_undefined: false },
     "aria-autocomplete" => AriaPropertyType::Token { values: &["inline", "list", "both", "none"] },
     "aria-braillelabel" => AriaPropertyType::String,
+    "aria-checked" => AriaPropertyType::Tristate,
     "aria-hidden" => AriaPropertyType::Boolean { allow_undefined: true },
     "aria-label" => AriaPropertyType::String,
 };
