@@ -14,9 +14,41 @@ use crate::{
     AstNode,
 };
 
-fn aria_proptypes_diagnostic(span: Span) -> OxcDiagnostic {
+fn aria_proptypes_diagnostic(
+    prop_name: &str,
+    prop_type: &AriaPropertyType,
+    span: Span,
+) -> OxcDiagnostic {
+    let message = match prop_type {
+        AriaPropertyType::String => format!("The value for {} must be a string.", prop_name),
+        AriaPropertyType::Id => {
+            format!("The value for {} must be a string that represents a DOM element ID", prop_name)
+        }
+        AriaPropertyType::IdList => format!(
+            "The value for {} must be a list of strings that represent DOM element IDs",
+            prop_name
+        ),
+        AriaPropertyType::Integer => format!("The value for {} must be an integer.", prop_name),
+        AriaPropertyType::Boolean { .. } => {
+            format!("The value for {} must be a boolean.", prop_name)
+        }
+        AriaPropertyType::Number => format!("The value for {} must be a number.", prop_name),
+        AriaPropertyType::Token { values } => format!(
+            "The value for {} must be a single token from the following: {}",
+            prop_name,
+            values.join(", ")
+        ),
+        AriaPropertyType::TokenList { values } => format!(
+            "The value for {} must be a list of one or more tokens from the following: {}",
+            prop_name,
+            values.join(", ")
+        ),
+        AriaPropertyType::Tristate => {
+            format!("The value for {} must be a boolean or the string \"mixed\".", prop_name)
+        }
+    };
     // TODO: Update the message and help text
-    OxcDiagnostic::warn("The value for ${name} must be a ${type}.").with_label(span)
+    OxcDiagnostic::warn(message).with_label(span)
 }
 
 #[derive(Debug, Default, Clone)]
@@ -57,11 +89,17 @@ impl Rule for AriaProptypes {
             let JSXAttributeItem::Attribute(attr) = attr else {
                 continue;
             };
-            let attr_name = get_jsx_attribute_name(&attr.name).to_lowercase();
+            let attr_name = &get_jsx_attribute_name(&attr.name);
             let attr_value = attr.value.as_ref();
-            if VALID_ARIA_PROPS.contains(attr_name.as_str()) {
-                if !is_aria_prop_valid(attr_name, attr_value) {
-                    ctx.diagnostic(aria_proptypes_diagnostic(attr.span));
+            if VALID_ARIA_PROPS.contains(attr_name) {
+                // Ignore attribute if it's not a valid ARIA property
+                let Some(prop_type) = ARIA_PROPERTY_TYPES.get(attr_name) else {
+                    // Unless we have an explicit type, we should assume it's valid to prevent false positives
+                    continue;
+                };
+
+                if !is_aria_prop_valid(prop_type, attr_value) {
+                    ctx.diagnostic(aria_proptypes_diagnostic(attr_name, prop_type, attr.span));
                     return;
                 }
             }
@@ -257,16 +295,11 @@ fn test() {
     Tester::new(AriaProptypes::NAME, pass, fail).test_and_snapshot();
 }
 
-/// Given an ARIA property name and its value, determine if the value is valid
-/// for the type of the property.
-fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>) -> bool {
-    // Ignore attribute if it's not a valid ARIA property
-    let Some(prop_type) = ARIA_PROPERTY_TYPES.get(prop_name.as_str()) else {
-        // Unless we have an explicit type, we should assume it's valid to prevent false positives
-        return true;
-    };
-    dbg!(prop_name, prop_type, prop_value);
-
+/// Given an ARIA property type and its value, determine if the value is valid
+fn is_aria_prop_valid(
+    prop_type: &AriaPropertyType,
+    prop_value: Option<&JSXAttributeValue>,
+) -> bool {
     if let Some(JSXAttributeValue::ExpressionContainer(expr)) = prop_value {
         match &expr.expression {
             // Ignore the attribute if its prop value is null or undefined
