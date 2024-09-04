@@ -266,15 +266,14 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
     };
     dbg!(prop_name, prop_type, prop_value);
 
-    // Ignore the attribute if its prop value is null or undefined
     if let Some(JSXAttributeValue::ExpressionContainer(expr)) = prop_value {
-        if let JSXExpression::NullLiteral(_) = &expr.expression {
-            return true;
-        }
-        if let JSXExpression::Identifier(ident) = &expr.expression {
-            if ident.name == "undefined" {
-                return true;
-            }
+        match &expr.expression {
+            // Ignore the attribute if its prop value is null or undefined
+            JSXExpression::NullLiteral(_) => return true,
+            JSXExpression::Identifier(ident) if ident.name == "undefined" => return true,
+            // Generally allow identifiers and member expressions
+            JSXExpression::Identifier(_) | JSXExpression::StaticMemberExpression(_) => return true,
+            _ => {}
         }
     }
 
@@ -328,8 +327,6 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             match prop_value {
                 JSXAttributeValue::StringLiteral(_) => is_integer_value,
                 JSXAttributeValue::ExpressionContainer(expr) => match &expr.expression {
-                    JSXExpression::Identifier(_) => true,
-                    JSXExpression::StaticMemberExpression(_) => true,
                     _ => is_integer_value,
                 },
                 _ => false,
@@ -344,7 +341,20 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             };
             parsed_value.is_finite()
         }
-        AriaPropertyType::Token { values: _ } => todo!(),
+        AriaPropertyType::Token { .. } => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => {
+                is_token_value(&value.value, prop_type)
+            }
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_token_value(&str_lit.value, prop_type),
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_token_value(&template.quasis[0].value.raw, prop_type)
+                }
+                _ => true,
+            },
+            _ => false,
+        },
         AriaPropertyType::TokenList { values: _ } => todo!(),
         AriaPropertyType::Tristate => match prop_value {
             Some(JSXAttributeValue::StringLiteral(value)) => is_tristate_value(&value.value),
@@ -372,6 +382,14 @@ fn is_boolean_value(value: &str) -> bool {
 
 fn is_tristate_value(value: &str) -> bool {
     is_boolean_value(value) || value == "mixed"
+}
+
+fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    match prop_type {
+        // CHeck if the value is in the list of valid tokens, case insensitive
+        AriaPropertyType::Token { values } => values.iter().any(|v| v.eq_ignore_ascii_case(value)),
+        _ => false,
+    }
 }
 
 /// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
