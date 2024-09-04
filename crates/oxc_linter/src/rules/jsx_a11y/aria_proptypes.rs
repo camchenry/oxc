@@ -355,7 +355,22 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             },
             _ => false,
         },
-        AriaPropertyType::TokenList { values: _ } => todo!(),
+        AriaPropertyType::TokenList { .. } => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => {
+                is_token_list_value(&value.value, prop_type)
+            }
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => {
+                    is_token_list_value(&str_lit.value, prop_type)
+                }
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_token_list_value(&template.quasis[0].value.raw, prop_type)
+                }
+                _ => true,
+            },
+            _ => false,
+        },
         AriaPropertyType::Tristate => match prop_value {
             Some(JSXAttributeValue::StringLiteral(value)) => is_tristate_value(&value.value),
             Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
@@ -387,7 +402,19 @@ fn is_tristate_value(value: &str) -> bool {
 fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
     match prop_type {
         // CHeck if the value is in the list of valid tokens, case insensitive
-        AriaPropertyType::Token { values } => values.iter().any(|v| v.eq_ignore_ascii_case(value)),
+        AriaPropertyType::Token { values } | AriaPropertyType::TokenList { values } => {
+            values.iter().any(|v| v.eq_ignore_ascii_case(value))
+        }
+        _ => false,
+    }
+}
+
+fn is_token_list_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    match prop_type {
+        // Check if all values in the list are in the list of valid tokens, case insensitive
+        AriaPropertyType::TokenList { .. } => {
+            value.split_whitespace().all(|v| is_token_value(v, prop_type))
+        }
         _ => false,
     }
 }
