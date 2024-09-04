@@ -47,7 +47,6 @@ fn aria_proptypes_diagnostic(
             format!("The value for {} must be a boolean or the string \"mixed\".", prop_name)
         }
     };
-    // TODO: Update the message and help text
     OxcDiagnostic::warn(message).with_label(span)
 }
 
@@ -57,26 +56,33 @@ pub struct AriaProptypes;
 declare_oxc_lint!(
     /// ### What it does
     ///
+    /// Enforces that values of ARIA attributes are valid.
     ///
     /// ### Why is this bad?
     ///
+    /// ARIA attributes must conform to certain values, depending on their type, in order to be understood correctly by assistive technologies.
     ///
     /// ### Examples
     ///
     /// Examples of **incorrect** code for this rule:
     /// ```jsx
-    /// FIXME: Tests will fail if examples are missing or syntactically incorrect.
+    /// <div aria-hidden="yes" />
+    /// <div aria-level={true} />
+    /// <div aria-sort="ascending descending" />
+    /// <div aria-valuemax />
+    /// <div aria-label={1234} />
     /// ```
     ///
     /// Examples of **correct** code for this rule:
     /// ```jsx
-    /// FIXME: Tests will fail if examples are missing or syntactically incorrect.
+    /// <div aria-hidden="true" />
+    /// <div aria-level={2} />
+    /// <div aria-sort="ascending" />
+    /// <div aria-valuemax={100} />
+    /// <div aria-label="Close" />
     /// ```
     AriaProptypes,
-    correctness,
-    pending  // TODO: describe fix capabilities. Remove if no fix can be done,
-             // keep at 'pending' if you think one could be added but don't know how.
-             // Options are 'fix', 'fix_dangerous', 'suggestion', and 'conditional_fix_suggestion'
+    correctness
 );
 
 impl Rule for AriaProptypes {
