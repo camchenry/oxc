@@ -284,13 +284,24 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             Some(JSXAttributeValue::StringLiteral(_)) => true,
             Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
                 JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_)
+                | JSXExpression::BooleanLiteral(_)
+                | JSXExpression::UnaryExpression(_)
+                | JSXExpression::LogicalExpression(_) => false,
+                _ => true,
+            },
+            _ => false,
+        },
+        AriaPropertyType::Id => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
                 JSXExpression::NumericLiteral(_) => false,
                 JSXExpression::BooleanLiteral(_) => false,
                 _ => true,
             },
             _ => false,
         },
-        AriaPropertyType::Id => todo!(),
         AriaPropertyType::IdList => todo!(),
         AriaPropertyType::Integer => todo!(),
         AriaPropertyType::Number => todo!(),
