@@ -260,6 +260,7 @@ fn test() {
 /// Given an ARIA property name and its value, determine if the value is valid
 /// for the type of the property.
 fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>) -> bool {
+    // Ignore attribute if it's not a valid ARIA property
     let Some(prop_type) = ARIA_PROPERTY_TYPES.get(prop_name.as_str()) else {
         // Unless we have an explicit type, we should assume it's valid to prevent false positives
         return true;
@@ -317,7 +318,16 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             },
             _ => false,
         },
-        AriaPropertyType::IdList => todo!(),
+        AriaPropertyType::IdList => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::BooleanLiteral(_) => false,
+                _ => true,
+            },
+            _ => false,
+        },
         AriaPropertyType::Integer => {
             let Some(prop_value) = prop_value else {
                 return false;
@@ -341,7 +351,7 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
             };
             parsed_value.is_finite()
         }
-        AriaPropertyType::Token { .. } => match prop_value {
+        AriaPropertyType::Token { values } => match prop_value {
             Some(JSXAttributeValue::StringLiteral(value)) => {
                 is_token_value(&value.value, prop_type)
             }
@@ -350,6 +360,9 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
                 JSXExpression::TemplateLiteral(template) => {
                     template.expressions.is_empty()
                         && is_token_value(&template.quasis[0].value.raw, prop_type)
+                }
+                JSXExpression::BooleanLiteral(_) => {
+                    values.contains(&"true") && values.contains(&"false")
                 }
                 _ => true,
             },
@@ -367,6 +380,7 @@ fn is_aria_prop_valid(prop_name: String, prop_value: Option<&JSXAttributeValue>)
                     template.expressions.is_empty()
                         && is_token_list_value(&template.quasis[0].value.raw, prop_type)
                 }
+                JSXExpression::BooleanLiteral(_) => false,
                 _ => true,
             },
             _ => false,
@@ -400,6 +414,9 @@ fn is_tristate_value(value: &str) -> bool {
 }
 
 fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    if value.is_empty() {
+        return false;
+    }
     match prop_type {
         // CHeck if the value is in the list of valid tokens, case insensitive
         AriaPropertyType::Token { values } | AriaPropertyType::TokenList { values } => {
@@ -410,6 +427,9 @@ fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
 }
 
 fn is_token_list_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    if value.is_empty() {
+        return false;
+    }
     match prop_type {
         // Check if all values in the list are in the list of valid tokens, case insensitive
         AriaPropertyType::TokenList { .. } => {
