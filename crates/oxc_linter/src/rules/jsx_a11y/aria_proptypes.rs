@@ -113,6 +113,274 @@ impl Rule for AriaProptypes {
     }
 }
 
+/// Given an ARIA property type and its value, determine if the value is valid
+fn is_aria_prop_valid(
+    prop_type: &AriaPropertyType,
+    prop_value: Option<&JSXAttributeValue>,
+) -> bool {
+    if let Some(JSXAttributeValue::ExpressionContainer(expr)) = prop_value {
+        match &expr.expression {
+            // Ignore the attribute if its prop value is null or undefined
+            JSXExpression::NullLiteral(_) => return true,
+            JSXExpression::Identifier(ident) if ident.name == "undefined" => return true,
+            // Generally allow identifiers and member expressions
+            JSXExpression::Identifier(_) | JSXExpression::StaticMemberExpression(_) => return true,
+            _ => {}
+        }
+    }
+
+    // If we don't recognize the syntax specifically, we will assume it's valid to try and prevent false positives.
+    let assume_valid = true;
+
+    // TODO: Improve the resolution of static values so that we can type-check more complex expressions. We should
+    // ultimately have a way of trying to parse a boolean/string/number from a given AST node.
+    // For example, we currently assume this is valid, but we could check it: `<div aria-invalid={true ? 0 : -1}>` just
+    // based on the fact that neither of the two branches are possibly "true" or "false".
+
+    dbg!(prop_type, prop_value);
+    match prop_type {
+        AriaPropertyType::Boolean { allow_undefined } => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => is_boolean_value(&value.value),
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_boolean_value(&str_lit.value),
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_boolean_value(&template.quasis[0].value.raw)
+                }
+                JSXExpression::BooleanLiteral(_)
+                | JSXExpression::LogicalExpression(_)
+                | JSXExpression::UnaryExpression(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::ConditionalExpression(_) => true,
+                _ => true,
+            },
+            None => *allow_undefined,
+            _ => assume_valid,
+        },
+        AriaPropertyType::String => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_)
+                | JSXExpression::BooleanLiteral(_)
+                | JSXExpression::UnaryExpression(_)
+                | JSXExpression::LogicalExpression(_) => false,
+                _ => true,
+            },
+            None => false,
+            _ => assume_valid,
+        },
+        AriaPropertyType::Id => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::BooleanLiteral(_) => false,
+                _ => true,
+            },
+            _ => assume_valid,
+        },
+        AriaPropertyType::IdList => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(_)) => true,
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::BooleanLiteral(_) => false,
+                _ => true,
+            },
+            _ => assume_valid,
+        },
+        AriaPropertyType::Integer => {
+            let Some(prop_value) = prop_value else {
+                return false;
+            };
+            let is_integer_value =
+                parse_jsx_value(prop_value).map_or(false, |num| num.fract() == 0.0);
+            match prop_value {
+                JSXAttributeValue::StringLiteral(_) => is_integer_value,
+                JSXAttributeValue::ExpressionContainer(_) => is_integer_value,
+                _ => assume_valid,
+            }
+        }
+        AriaPropertyType::Number => {
+            let Some(prop_value) = prop_value else {
+                return false;
+            };
+            let Ok(parsed_value) = parse_jsx_value(prop_value) else {
+                return false;
+            };
+            parsed_value.is_finite()
+        }
+        AriaPropertyType::Token { values } => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => {
+                is_token_value(&value.value, prop_type)
+            }
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_token_value(&str_lit.value, prop_type),
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_token_value(&template.quasis[0].value.raw, prop_type)
+                }
+                JSXExpression::BooleanLiteral(_)
+                | JSXExpression::UnaryExpression(_)
+                | JSXExpression::LogicalExpression(_) => {
+                    values.contains(&"true") && values.contains(&"false")
+                }
+                JSXExpression::NumericLiteral(_) => false,
+                _ => assume_valid,
+            },
+            None => false,
+            _ => assume_valid,
+        },
+        AriaPropertyType::TokenList { .. } => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => {
+                is_token_list_value(&value.value, prop_type)
+            }
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => {
+                    is_token_list_value(&str_lit.value, prop_type)
+                }
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_token_list_value(&template.quasis[0].value.raw, prop_type)
+                }
+                JSXExpression::BooleanLiteral(_) => false,
+                _ => assume_valid,
+            },
+            None => false,
+            _ => assume_valid,
+        },
+        AriaPropertyType::Tristate => match prop_value {
+            Some(JSXAttributeValue::StringLiteral(value)) => is_tristate_value(&value.value),
+            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
+                JSXExpression::StringLiteral(str_lit) => is_tristate_value(&str_lit.value),
+                JSXExpression::BooleanLiteral(_)
+                | JSXExpression::LogicalExpression(_)
+                | JSXExpression::UnaryExpression(_) => true,
+                JSXExpression::NumericLiteral(_) => false,
+                JSXExpression::TemplateLiteral(template) => {
+                    template.expressions.is_empty()
+                        && is_tristate_value(&template.quasis[0].value.raw)
+                }
+                _ => assume_valid,
+            },
+            None => true,
+            _ => assume_valid,
+        },
+    }
+}
+
+fn is_boolean_value(value: &str) -> bool {
+    value == "true" || value == "false"
+}
+
+fn is_tristate_value(value: &str) -> bool {
+    is_boolean_value(value) || value == "mixed"
+}
+
+fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    match prop_type {
+        // CHeck if the value is in the list of valid tokens, case insensitive
+        AriaPropertyType::Token { values } | AriaPropertyType::TokenList { values } => {
+            values.iter().any(|v| v.eq_ignore_ascii_case(value))
+        }
+        _ => false,
+    }
+}
+
+fn is_token_list_value(value: &str, prop_type: &AriaPropertyType) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    match prop_type {
+        // Check if all values in the list are in the list of valid tokens, case insensitive
+        AriaPropertyType::TokenList { .. } => {
+            value.split_whitespace().all(|v| is_token_value(v, prop_type))
+        }
+        _ => false,
+    }
+}
+
+/// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
+#[derive(Debug)]
+enum AriaPropertyType {
+    /// Unconstrained value type
+    String,
+    /// Reference to the ID of another element in the same document
+    Id,
+    /// A list of one or more ID references.
+    IdList,
+    /// A numerical value without a fractional component.
+    Integer,
+    /// Value representing either true or false. The default value for this value type is false unless otherwise specified.
+    Boolean { allow_undefined: bool },
+    /// Any real numerical value.
+    Number,
+    /// One of a limited set of allowed values.
+    Token { values: &'static [&'static str] },
+    /// A list of one or more tokens.
+    TokenList { values: &'static [&'static str] },
+    /// Value representing true, false, mixed, or undefined values. The default value for this value type is undefined unless otherwise specified.
+    Tristate,
+}
+
+const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_map! {
+    "aria-activedescendant" => AriaPropertyType::Id,
+    "aria-atomic" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-autocomplete" => AriaPropertyType::Token { values: &["inline", "list", "both", "none"] },
+    "aria-braillelabel" => AriaPropertyType::String,
+    "aria-brailleroledescription" => AriaPropertyType::String,
+    "aria-busy" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-checked" => AriaPropertyType::Tristate,
+    "aria-colcount" => AriaPropertyType::Integer,
+    "aria-colindex" => AriaPropertyType::Integer,
+    "aria-colspan" => AriaPropertyType::Integer,
+    "aria-controls" => AriaPropertyType::IdList,
+    "aria-current" => AriaPropertyType::Token { values: &["page", "step", "location", "date", "time", "true", "false"] },
+    "aria-describedby" => AriaPropertyType::IdList,
+    "aria-description" => AriaPropertyType::String,
+    "aria-details" => AriaPropertyType::Id,
+    "aria-disabled" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-dropeffect" => AriaPropertyType::TokenList { values: &["none", "copy", "execute", "link", "move", "popup"] },
+    "aria-errormessage" => AriaPropertyType::Id,
+    "aria-expanded" => AriaPropertyType::Boolean { allow_undefined:true },
+    "aria-flowto" => AriaPropertyType::IdList,
+    "aria-grabbed" => AriaPropertyType::Boolean { allow_undefined: true },
+    "aria-haspopup" => AriaPropertyType::Token { values: &["menu", "listbox", "tree", "grid", "dialog", "true", "false"] },
+    "aria-hidden" => AriaPropertyType::Boolean { allow_undefined: true },
+    "aria-invalid" => AriaPropertyType::Token { values: &["grammar", "spelling", "true", "false"] },
+    "aria-keyshortcuts" => AriaPropertyType::String,
+    "aria-label" => AriaPropertyType::String,
+    "aria-labelledby" => AriaPropertyType::IdList,
+    "aria-level" => AriaPropertyType::Integer,
+    "aria-live" => AriaPropertyType::Token { values: &["off", "assertive", "polite"] },
+    "aria-modal" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-multiline" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-multiselectable" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-orientation" => AriaPropertyType::Token { values: &["horizontal", "vertical", "undefined"] },
+    "aria-owns" => AriaPropertyType::IdList,
+    "aria-placeholder" => AriaPropertyType::String,
+    "aria-posinset" => AriaPropertyType::Integer,
+    "aria-pressed" => AriaPropertyType::Tristate,
+    "aria-readonly" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-relevant" => AriaPropertyType::TokenList { values: &["additions", "removals", "text", "all"] },
+    "aria-required" => AriaPropertyType::Boolean { allow_undefined: false },
+    "aria-roledescription" => AriaPropertyType::String,
+    "aria-rowcount" => AriaPropertyType::Integer,
+    "aria-rowindex" => AriaPropertyType::Integer,
+    "aria-rowspan" => AriaPropertyType::Integer,
+    "aria-selected" => AriaPropertyType::Boolean { allow_undefined: true },
+    "aria-setsize" => AriaPropertyType::Integer,
+    "aria-sort" => AriaPropertyType::Token { values: &["ascending", "descending", "none", "other"] },
+    "aria-valuemax" => AriaPropertyType::Number,
+    "aria-valuemin" => AriaPropertyType::Number,
+    "aria-valuenow" => AriaPropertyType::Number,
+    "aria-valuetext" => AriaPropertyType::String,
+};
+
 #[test]
 fn test() {
     use crate::tester::Tester;
@@ -171,6 +439,8 @@ fn test() {
         "<div aria-valuemax={-123} />",
         "<div aria-valuemax={+123} />",
         "<div aria-valuemax={~123} />",
+        "<div aria-valuemax={123.123} />",
+        r#"<div aria-valuemax="123.123" />"#,
         r#"<div aria-valuemax={"123"} />"#,
         "<div aria-valuemax={`123`} />",
         r#"<div aria-valuemax="123" />"#,
@@ -296,261 +566,64 @@ fn test() {
         r#"<div aria-relevant={"false"} />"#,
         r#"<div aria-relevant="additions removalss" />"#,
         r#"<div aria-relevant="additions removalss " />"#,
+        // Test for each attribute
+        r#"<div aria-activedescendant={true} />"#,
+        r#"<div aria-atomic="yes" />"#,
+        r#"<div aria-autocomplete="no" />"#,
+        r#"<div aria-busy="yes" />"#,
+        r#"<div aria-checked="no" />"#,
+        r#"<div aria-colcount={1.3} />"#,
+        r#"<div aria-colindex={1.3} />"#,
+        r#"<div aria-colspan={1.3} />"#,
+        r#"<div aria-controls={false} />"#,
+        r#"<div aria-current="yes" />"#,
+        r#"<div aria-current={1.23} />"#,
+        r#"<div aria-describedby={true} />"#,
+        r#"<div aria-description={1} />"#,
+        r#"<div aria-details={1} />"#,
+        r#"<div aria-disabled={"yes"} />"#,
+        r#"<div aria-dropeffect="none copy test 123" />"#,
+        r#"<div aria-errormessage="this is not an id" />"#,
+        r#"<div aria-expanded={!"true"} />"#,
+        r#"<div aria-flowto={1} />"#,
+        r#"<div aria-grabbed={1} />"#,
+        r#"<div aria-haspopup={1} />"#,
+        r#"<div aria-haspopup="menu listbox" />"#,
+        r#"<div aria-hidden={1} />"#,
+        r#"<div aria-invalid="yeah" />"#,
+        r#"<div aria-invalid={0} />"#,
+        r#"<div aria-keyshortcuts={1} />"#,
+        r#"<div aria-label={1} />"#,
+        r#"<div aria-labelledby={1} />"#,
+        r#"<div aria-level={1.3} />"#,
+        r#"<div aria-live="assertive polite" />"#,
+        r#"<div aria-live={!!true} />"#,
+        r#"<div aria-modal="yes" />"#,
+        r#"<div aria-multiline="yes" />"#,
+        r#"<div aria-multiselectable="yes" />"#,
+        r#"<div aria-orientation="yes" />"#,
+        r#"<div aria-orientation="horizontal vertical" />"#,
+        r#"<div aria-owns={1} />"#,
+        r#"<div aria-placeholder={1} />"#,
+        r#"<div aria-placeholder={false} />"#,
+        r#"<div aria-posinset={1.3} />"#,
+        r#"<div aria-pressed="yes" />"#,
+        r#"<div aria-readonly="yes" />"#,
+        r#"<div aria-relevant="test" />"#,
+        r#"<div aria-relevant={123} />"#,
+        r#"<div aria-required="yes" />"#,
+        r#"<div aria-roledescription={1} />"#,
+        r#"<div aria-rowcount={1.3} />"#,
+        r#"<div aria-rowindex={1.3} />"#,
+        r#"<div aria-rowspan={1.3} />"#,
+        r#"<div aria-selected="yes" />"#,
+        r#"<div aria-setsize={1.3} />"#,
+        r#"<div aria-sort="test" />"#,
+        r#"<div aria-valuemax={!0} />"#,
+        r#"<div aria-valuemin={!0)} />"#,
+        r#"<div aria-valuenow={!0} />"#,
+        r#"<div aria-valuetext={99} />"#,
     ];
 
     Tester::new(AriaProptypes::NAME, pass, fail).test_and_snapshot();
 }
-
-/// Given an ARIA property type and its value, determine if the value is valid
-fn is_aria_prop_valid(
-    prop_type: &AriaPropertyType,
-    prop_value: Option<&JSXAttributeValue>,
-) -> bool {
-    if let Some(JSXAttributeValue::ExpressionContainer(expr)) = prop_value {
-        match &expr.expression {
-            // Ignore the attribute if its prop value is null or undefined
-            JSXExpression::NullLiteral(_) => return true,
-            JSXExpression::Identifier(ident) if ident.name == "undefined" => return true,
-            // Generally allow identifiers and member expressions
-            JSXExpression::Identifier(_) | JSXExpression::StaticMemberExpression(_) => return true,
-            _ => {}
-        }
-    }
-
-    match prop_type {
-        AriaPropertyType::Boolean { allow_undefined } => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(value)) => is_boolean_value(&value.value),
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(str_lit) => is_boolean_value(&str_lit.value),
-                JSXExpression::TemplateLiteral(template) => {
-                    template.expressions.is_empty()
-                        && is_boolean_value(&template.quasis[0].value.raw)
-                }
-                JSXExpression::BooleanLiteral(_)
-                | JSXExpression::LogicalExpression(_)
-                | JSXExpression::UnaryExpression(_) => true,
-                JSXExpression::NumericLiteral(_) => false,
-                _ => true,
-            },
-            None => *allow_undefined,
-            _ => false,
-        },
-        AriaPropertyType::String => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(_)) => true,
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
-                JSXExpression::NumericLiteral(_)
-                | JSXExpression::BooleanLiteral(_)
-                | JSXExpression::UnaryExpression(_)
-                | JSXExpression::LogicalExpression(_) => false,
-                _ => true,
-            },
-            _ => false,
-        },
-        AriaPropertyType::Id => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(_)) => true,
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
-                JSXExpression::NumericLiteral(_) => false,
-                JSXExpression::BooleanLiteral(_) => false,
-                _ => true,
-            },
-            _ => false,
-        },
-        AriaPropertyType::IdList => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(_)) => true,
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(_) | JSXExpression::TemplateLiteral(_) => true,
-                JSXExpression::NumericLiteral(_) => false,
-                JSXExpression::BooleanLiteral(_) => false,
-                _ => true,
-            },
-            _ => false,
-        },
-        AriaPropertyType::Integer => {
-            let Some(prop_value) = prop_value else {
-                return false;
-            };
-            let is_integer_value =
-                parse_jsx_value(prop_value).map_or(false, |num| num.fract() == 0.0);
-            match prop_value {
-                JSXAttributeValue::StringLiteral(_) => is_integer_value,
-                JSXAttributeValue::ExpressionContainer(expr) => match &expr.expression {
-                    _ => is_integer_value,
-                },
-                _ => false,
-            }
-        }
-        AriaPropertyType::Number => {
-            let Some(prop_value) = prop_value else {
-                return false;
-            };
-            let Ok(parsed_value) = parse_jsx_value(prop_value) else {
-                return false;
-            };
-            parsed_value.is_finite()
-        }
-        AriaPropertyType::Token { values } => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(value)) => {
-                is_token_value(&value.value, prop_type)
-            }
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(str_lit) => is_token_value(&str_lit.value, prop_type),
-                JSXExpression::TemplateLiteral(template) => {
-                    template.expressions.is_empty()
-                        && is_token_value(&template.quasis[0].value.raw, prop_type)
-                }
-                JSXExpression::BooleanLiteral(_) => {
-                    values.contains(&"true") && values.contains(&"false")
-                }
-                _ => true,
-            },
-            _ => false,
-        },
-        AriaPropertyType::TokenList { .. } => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(value)) => {
-                is_token_list_value(&value.value, prop_type)
-            }
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(str_lit) => {
-                    is_token_list_value(&str_lit.value, prop_type)
-                }
-                JSXExpression::TemplateLiteral(template) => {
-                    template.expressions.is_empty()
-                        && is_token_list_value(&template.quasis[0].value.raw, prop_type)
-                }
-                JSXExpression::BooleanLiteral(_) => false,
-                _ => true,
-            },
-            _ => false,
-        },
-        AriaPropertyType::Tristate => match prop_value {
-            Some(JSXAttributeValue::StringLiteral(value)) => is_tristate_value(&value.value),
-            Some(JSXAttributeValue::ExpressionContainer(expr)) => match &expr.expression {
-                JSXExpression::StringLiteral(str_lit) => is_tristate_value(&str_lit.value),
-                JSXExpression::BooleanLiteral(_)
-                | JSXExpression::LogicalExpression(_)
-                | JSXExpression::UnaryExpression(_) => true,
-                JSXExpression::NumericLiteral(_) => false,
-                JSXExpression::TemplateLiteral(template) => {
-                    template.expressions.is_empty()
-                        && is_tristate_value(&template.quasis[0].value.raw)
-                }
-                _ => true,
-            },
-            None => true,
-            _ => false,
-        },
-    }
-}
-
-fn is_boolean_value(value: &str) -> bool {
-    value == "true" || value == "false"
-}
-
-fn is_tristate_value(value: &str) -> bool {
-    is_boolean_value(value) || value == "mixed"
-}
-
-fn is_token_value(value: &str, prop_type: &AriaPropertyType) -> bool {
-    if value.is_empty() {
-        return false;
-    }
-    match prop_type {
-        // CHeck if the value is in the list of valid tokens, case insensitive
-        AriaPropertyType::Token { values } | AriaPropertyType::TokenList { values } => {
-            values.iter().any(|v| v.eq_ignore_ascii_case(value))
-        }
-        _ => false,
-    }
-}
-
-fn is_token_list_value(value: &str, prop_type: &AriaPropertyType) -> bool {
-    if value.is_empty() {
-        return false;
-    }
-    match prop_type {
-        // Check if all values in the list are in the list of valid tokens, case insensitive
-        AriaPropertyType::TokenList { .. } => {
-            value.split_whitespace().all(|v| is_token_value(v, prop_type))
-        }
-        _ => false,
-    }
-}
-
-/// https://www.w3.org/TR/wai-aria-1.2/#propcharacteristic_value
-#[derive(Debug)]
-enum AriaPropertyType {
-    /// Unconstrained value type
-    String,
-    /// Reference to the ID of another element in the same document
-    Id,
-    /// A list of one or more ID references.
-    IdList,
-    /// A numerical value without a fractional component.
-    Integer,
-    /// Value representing either true or false. The default value for this value type is false unless otherwise specified.
-    Boolean { allow_undefined: bool },
-    /// Any real numerical value.
-    Number,
-    /// One of a limited set of allowed values.
-    Token { values: &'static [&'static str] },
-    /// A list of one or more tokens.
-    TokenList { values: &'static [&'static str] },
-    /// Value representing true, false, mixed, or undefined values. The default value for this value type is undefined unless otherwise specified.
-    Tristate,
-}
-
-const ARIA_PROPERTY_TYPES: phf::Map<&'static str, AriaPropertyType> = phf::phf_map! {
-    "aria-activedescendant" => AriaPropertyType::Id,
-    "aria-atomic" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-autocomplete" => AriaPropertyType::Token { values: &["inline", "list", "both", "none"] },
-    "aria-braillelabel" => AriaPropertyType::String,
-    "aria-brailleroledescription" => AriaPropertyType::String,
-    "aria-busy" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-checked" => AriaPropertyType::Tristate,
-    "aria-colcount" => AriaPropertyType::Integer,
-    "aria-colindex" => AriaPropertyType::Integer,
-    "aria-colspan" => AriaPropertyType::Integer,
-    "aria-controls" => AriaPropertyType::IdList,
-    "aria-current" => AriaPropertyType::Token { values: &["page", "step", "location", "date", "time", "true", "false"] },
-    "aria-describedby" => AriaPropertyType::IdList,
-    "aria-description" => AriaPropertyType::String,
-    "aria-details" => AriaPropertyType::Id,
-    "aria-disabled" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-dropeffect" => AriaPropertyType::TokenList { values: &["none", "copy", "execute", "link", "move", "popup"] },
-    "aria-errormessage" => AriaPropertyType::Id,
-    "aria-expanded" => AriaPropertyType::Boolean { allow_undefined:true },
-    "aria-flowto" => AriaPropertyType::IdList,
-    "aria-grabbed" => AriaPropertyType::Boolean { allow_undefined: true },
-    "aria-haspopup" => AriaPropertyType::Token { values: &["menu", "listbox", "tree", "grid", "dialog", "true", "false"] },
-    "aria-hidden" => AriaPropertyType::Boolean { allow_undefined: true },
-    "aria-invalid" => AriaPropertyType::Token { values: &["grammar", "spelling", "true", "false"] },
-    "aria-keyshortcuts" => AriaPropertyType::String,
-    "aria-label" => AriaPropertyType::String,
-    "aria-labelledby" => AriaPropertyType::IdList,
-    "aria-level" => AriaPropertyType::Integer,
-    "aria-live" => AriaPropertyType::Token { values: &["off", "assertive", "polite"] },
-    "aria-modal" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-multiline" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-multiselectable" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-orientation" => AriaPropertyType::Token { values: &["horizontal", "vertical", "undefined"] },
-    "aria-owns" => AriaPropertyType::IdList,
-    "aria-placeholder" => AriaPropertyType::String,
-    "aria-posinset" => AriaPropertyType::Integer,
-    "aria-pressed" => AriaPropertyType::Tristate,
-    "aria-readonly" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-relevant" => AriaPropertyType::TokenList { values: &["additions", "removals", "text", "all"] },
-    "aria-required" => AriaPropertyType::Boolean { allow_undefined: false },
-    "aria-roledescription" => AriaPropertyType::String,
-    "aria-rowcount" => AriaPropertyType::Integer,
-    "aria-rowindex" => AriaPropertyType::Integer,
-    "aria-rowspan" => AriaPropertyType::Integer,
-    "aria-selected" => AriaPropertyType::Boolean { allow_undefined: true },
-    "aria-setsize" => AriaPropertyType::Integer,
-    "aria-sort" => AriaPropertyType::Token { values: &["ascending", "descending", "none", "other"] },
-    "aria-valuemax" => AriaPropertyType::Number,
-    "aria-valuemin" => AriaPropertyType::Number,
-    "aria-valuenow" => AriaPropertyType::Number,
-    "aria-valuetext" => AriaPropertyType::String,
-};

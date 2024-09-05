@@ -1,0 +1,297 @@
+---
+source: crates/oxc_linter/src/tester.rs
+assertion_line: 302
+---
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-hidden must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-hidden="yes" />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-hidden must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-hidden="no" />
+   ·      ────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-hidden must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-hidden={"no"} />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-hidden must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-hidden={1234} />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-hidden must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-hidden={`${abc}`} />
+   ·      ──────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-label must be a string.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-label />
+   ·      ──────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-label must be a string.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-label={true} />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-label must be a string.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-label={false} />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-label must be a string.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-label={1234} />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-label must be a string.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-label={!true} />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-checked must be a boolean or the string "mixed".
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-checked="yes" />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-checked must be a boolean or the string "mixed".
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-checked="no" />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-checked must be a boolean or the string "mixed".
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-checked={1234} />
+   ·      ───────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-checked must be a boolean or the string "mixed".
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-checked={`${abc}`} />
+   ·      ───────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level="yes" />
+   ·      ────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level="no" />
+   ·      ───────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level={`abc`} />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level={true} />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level />
+   ·      ──────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level={"false"} />
+   ·      ────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-level must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-level={!"false"} />
+   ·      ─────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax="yes" />
+   ·      ───────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax="no" />
+   ·      ──────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax={`abc`} />
+   ·      ─────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax={true} />
+   ·      ────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax />
+   ·      ─────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax={"false"} />
+   ·      ───────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-valuemax must be a number.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-valuemax={!"false"} />
+   ·      ────────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort="" />
+   ·      ────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort="descnding" />
+   ·      ─────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort />
+   ·      ─────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort={true} />
+   ·      ────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort={"false"} />
+   ·      ───────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-sort must be a single token from the following: ascending, descending, none, other
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-sort="ascending descending" />
+   ·      ────────────────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant="" />
+   ·      ────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant="foobar" />
+   ·      ──────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant />
+   ·      ─────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant={true} />
+   ·      ────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant={"false"} />
+   ·      ───────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant="additions removalss" />
+   ·      ───────────────────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-relevant must be a list of one or more tokens from the following: additions, removals, text, all
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-relevant="additions removalss " />
+   ·      ────────────────────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-activedescendant must be a string that represents a DOM element ID
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-activedescendant={true} />
+   ·      ────────────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-atomic must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-atomic="yes" />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-autocomplete must be a single token from the following: inline, list, both, none
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-autocomplete="no" />
+   ·      ──────────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-busy must be a boolean.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-busy="yes" />
+   ·      ───────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-checked must be a boolean or the string "mixed".
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-checked="no" />
+   ·      ─────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-colcount must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-colcount={1.3} />
+   ·      ───────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-colindex must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-colindex={1.3} />
+   ·      ───────────────────
+   ╰────
+
+  ⚠ eslint-plugin-jsx-a11y(aria-proptypes): The value for aria-colspan must be an integer.
+   ╭─[aria_proptypes.tsx:1:6]
+ 1 │ <div aria-colspan={1.3} />
+   ·      ──────────────────
+   ╰────
